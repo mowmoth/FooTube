@@ -37,7 +37,7 @@ namespace FooTube
     {
         // API_KEY should be constant 
         // defined via google-developer-console
-        const string API_KEY = "AIzaSyBKvPa_TS5JaOTACUj6iqDUAQISjZ-yoyM";
+        const string API_KEY = "";
 
         static void Main(string[] args)
         {
