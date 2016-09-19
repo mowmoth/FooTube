@@ -25,7 +25,7 @@ namespace FooTube
     ///     - [DONE] VERY UNRELIABLE -- can only find IDs of larger channels due to the way YouTube handles channels (=> YT sucks)
     ///     - [DONE] implement loop, so the process can be repeated
     ///     - [DONE] add channel class to access properties from first 
-    ///     - create method to handle request/response cycle
+    ///     - [DONE] create method to handle request/response cycle
     ///     - [DONE] access views-property on videos, possibly need another request for this
     ///     
     /// </summary>
@@ -96,25 +96,18 @@ namespace FooTube
         }
 
         #region Methods
-        static Channel GetChannel(string user)
+        static JObject GetHttpResponse(string requestString)
         {
-            // This is the basic setup for HTTP requests to the YouTube API
-            string requestString = "https://www.googleapis.com/youtube/v3/"     // Necessity, send all requests here
-                                    + "channels?"                               // The resource we're looking for 
-                                    + "key=" + API_KEY                          // Our API_KEY, Note: can use OAuth2 as an alternative
-                                    + "&forUsername=" + user                    // Search parameter
-                                    + "&part=id, snippet, statistics"           // We can limit the response to 'parts' to minimize data usage
-                                    + "&alt=json";                              // The format of our response. Here: 
+            JObject result = null;
 
-
-            // Initialize our request to the API
+            // Create a request handler from our requestString
+            // Create an object to hold the response, but ---
             var request = WebRequest.Create(requestString);
             WebResponse response;
 
+            // --- initialize it here in case it throws an exception
             try
             {
-                // WebResponse might throw an exception due to
-                // faulty a request string, so we initialize it here:
                 response = request.GetResponse();
             }
             catch (Exception ex)
@@ -128,17 +121,30 @@ namespace FooTube
             if (status != HttpStatusCode.OK)
                 return null;
 
-
             Console.WriteLine("==== Http-Response status: " + status.ToString() + " ====");
 
-            // Create a JSON object that equals the API response
-            JObject jChannel = null;
-
-            // Read the entire response, it gets recognized as J(son)Object
-            // Parse everything into our jChannel
+            // Read our response and parse it into our J(son)Object
             using (var reader = new StreamReader(response.GetResponseStream()))
-                jChannel = (JObject)JsonConvert.DeserializeObject(reader.ReadToEnd());
+                result = (JObject)JsonConvert.DeserializeObject(reader.ReadToEnd());
 
+            return result;
+        }
+
+        static Channel GetChannel(string user)
+        {
+            // This is the basic setup for HTTP requests to the YouTube API
+            string requestString = "https://www.googleapis.com/youtube/v3/"     // Necessity, send all requests here
+                                    + "channels?"                               // The resource we're looking for 
+                                    + "key=" + API_KEY                          // Our API_KEY, Note: can use OAuth2 as an alternative
+                                    + "&forUsername=" + user                    // Search parameter
+                                    + "&part=id, snippet, statistics"           // We can limit the response to 'parts' to minimize data usage
+                                    + "&alt=json";                              // The format of our response. Here: 
+
+
+
+
+            // Create a JSON object that equals the API response
+            JObject jChannel = GetHttpResponse(requestString);
 
             // Entering a non-existing username still returns a valid response for some reason
             // If that's the case our jChannel won't contain an id
@@ -164,36 +170,12 @@ namespace FooTube
                                     + "key=" + API_KEY                              // ---
                                     + "&channelId=" + id                            // We can filter our results by using our newly found ID
                                     + "&type=video"                                 // Another filter: We're looking for resources of type 'video'
-                                    + "&part=snippet,id"                               // We're interested in the 'snippet' of the resources, contains all the infos
+                                    + "&part=snippet,id"                            // We're interested in the 'snippet' of the resources, contains all the infos
                                     + "&order=date"                                 // Orders resources by date (descending)
                                     + "&maxResults=10"                              // Limits the number of entries to 10
                                     + "&alt=json";                                  // 
 
-
-            // See GetID() for an explanation on these
-            var request = WebRequest.Create(requestString);
-            WebResponse response;
-
-            try
-            {
-                response = request.GetResponse();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("====! " + ex.Message + " !====");
-                return null;
-            }
-
-            var status = ((HttpWebResponse)response).StatusCode;
-            if (status != HttpStatusCode.OK)
-                return null;
-
-            Console.WriteLine("==== Http-Response status: " + status.ToString() + " ====");
-
-            JObject jVideos = null;
-
-            using (var reader = new StreamReader(response.GetResponseStream()))
-                jVideos = (JObject)JsonConvert.DeserializeObject(reader.ReadToEnd());
+            JObject jVideos = GetHttpResponse(requestString);
 
             // Here we'll store our Video object
             // Created a Video class so it's easier to access properties
@@ -219,34 +201,10 @@ namespace FooTube
             string requestString = "https://www.googleapis.com/youtube/v3/"     // ---
                                    + "videos?"                                  // Only videos? contains info on viewsCount
                                    + "key=" + API_KEY                           // ---
-                                   + "&id=" + video.ID                                // We can filter our results by using our newly found ID
+                                   + "&id=" + video.ID                          // We can filter our results by using our newly found ID
                                    + "&part=statistics"                         // Contains viewCount
                                    + "&alt=json";                               // ---
-
-            // See GetID() for an explanation on these
-            var request = WebRequest.Create(requestString);
-            WebResponse response;
-
-            try
-            {
-                response = request.GetResponse();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("====! " + ex.Message + " !====");
-                return false;
-            }
-
-            var status = ((HttpWebResponse)response).StatusCode;
-            if (status != HttpStatusCode.OK)
-                return false;
-
-            Console.WriteLine("==== Http-Response status: " + status.ToString() + " ====");
-
-            JObject jVideo = null;
-
-            using (var reader = new StreamReader(response.GetResponseStream()))
-                jVideo = (JObject)JsonConvert.DeserializeObject(reader.ReadToEnd());
+            JObject jVideo = GetHttpResponse(requestString);
 
             // Update our video class
             video.Views = jVideo["items"][0]["statistics"]["viewCount"].ToString();
@@ -272,30 +230,7 @@ namespace FooTube
                                 + "&part=snippet"                           // ---
                                 + "&alt=json";                              // ---
 
-            var request = WebRequest.Create(requestString);
-            WebResponse response;
-
-            try
-            {
-                response = request.GetResponse();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("====! " + ex.Message + " !====");
-                return null;
-            }
-
-            var status = ((HttpWebResponse)response).StatusCode;
-            if (status != HttpStatusCode.OK)
-                return null;
-
-            Console.WriteLine("==== Http-Response status: " + status.ToString() + " ====");
-
-            JObject jChannel = null;
-
-            using (var reader = new StreamReader(response.GetResponseStream()))
-                jChannel = (JObject)JsonConvert.DeserializeObject(reader.ReadToEnd());
-
+            JObject jChannel = GetHttpResponse(requestString);
 
             // YouTube's search algorithms might have blessed us with more than one entry
             // We create an array to hold them all and go through each one to see if we have a match
@@ -314,6 +249,7 @@ namespace FooTube
 
             return null;
         }
+
     }
     #endregion
 
